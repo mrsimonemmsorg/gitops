@@ -1,0 +1,50 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: bill-dev-vcluster
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  annotations:
+    argocd.argoproj.io/sync-wave: '10'
+spec:
+  project: default
+  source:
+    repoURL: https://charts.loft.sh
+    targetRevision: 0.15.5
+    chart: vcluster-k8s
+    helm:
+      values: |
+        syncer:
+          extraArgs:
+          - --tls-san=bill-dev-vcluster.azure.kubefirst.simonemms.com
+          - --kube-config-context-name=bill-dev-vcluster
+          - --out-kube-config-server=https://bill-dev-vcluster.azure.kubefirst.simonemms.com
+          replicas: 4
+        ingress:
+          enabled: true
+          pathType: ImplementationSpecific
+          apiVersion: networking.k8s.io/v1
+          ingressClassName: "nginx"
+          host: bill-dev-vcluster.azure.kubefirst.simonemms.com
+          annotations:
+            nginx.ingress.kubernetes.io/backend-protocol: HTTPS
+            nginx.ingress.kubernetes.io/ssl-passthrough: "true"
+            nginx.ingress.kubernetes.io/ssl-redirect: "true"
+            cert-manager.io/cluster-issuer: "letsencrypt-prod"
+            
+            
+            
+          tls:
+            - secretName: bill-dev-vcluster-tls
+              hosts:
+                - bill-dev-vcluster.azure.kubefirst.simonemms.com
+  destination:
+    name: in-cluster
+    namespace: bill-dev-vcluster
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

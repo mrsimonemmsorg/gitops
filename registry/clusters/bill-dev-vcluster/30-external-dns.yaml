@@ -1,0 +1,54 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: bill-dev-vcluster-external-dns
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: '30'
+spec:
+  project: bill-dev-vcluster
+  source:
+    repoURL: https://kubernetes-sigs.github.io/external-dns
+    targetRevision: 1.14.4
+    helm:
+      releaseName: external-dns
+      values: |
+        image:
+          repository: registry.k8s.io/external-dns/external-dns
+          tag: "v0.13.2"
+        serviceAccount:
+          create: true
+          name: external-dns
+        provider: azure
+        sources:
+        - ingress
+        domainFilters:
+        - azure.kubefirst.simonemms.com
+        # Used if Cloudflare
+        env:
+        - name: not-used-uses-managed-service-principal
+          valueFrom:
+            secretKeyRef:
+              name: external-dns-secrets
+              key: token
+              optional: true
+        # Used if Azure
+        extraVolumes:
+        - name: azure-config-file
+          secret:
+            secretName: external-dns-secrets # Set in Terraform
+            optional: true
+        extraVolumeMounts:
+        - name: azure-config-file
+          mountPath: /etc/kubernetes
+          readOnly: true
+    chart: external-dns
+  destination:
+    name: bill-dev-vcluster
+    namespace: external-dns
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
